@@ -244,12 +244,20 @@ void IRAM_ATTR prayerAlert() {
 }
 
 void displayNextPrayer(){
-  display.setCursor(0, 15);
+  int16_t x1;
+  int16_t y1;
+  uint16_t width;
+  uint16_t height;
 
+  display.setCursor(0, 15);
+  display.clearDisplay();
   display.println("Next prayer:");
-  display.setCursor(30, 35);
-  display.println(prayerTimings.nextPrayerName);
-  display.setCursor(30, 55);
+
+  display.getTextBounds(prayerTimings.nextPrayerName, 0, 0, &x1, &y1, &width, &height);
+  display.setCursor((SCREEN_WIDTH - width) / 2, 35);
+  display.println(prayerTimings.nextPrayerName); 
+
+  display.setCursor(33, 55);
   display.print(prayerTimings.nextPrayer.hour);
   display.print(":");
   display.println(prayerTimings.nextPrayer.minute);
