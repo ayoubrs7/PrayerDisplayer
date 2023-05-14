@@ -57,6 +57,7 @@ DynamicJsonDocument doc(62770);
 String dataReceived = "";
 
 volatile bool isTimeToPray = false;
+volatile bool isPrayed = false;
 
 DayTime convertStringToDayTime(const char* timeString){
   DayTime dayTime;
@@ -105,7 +106,8 @@ void updatePrayerTimings(){
       
     // ----------------- JSON -----------------
     doc.clear();
-
+    
+    
     dataReceived = httpGETRequest(prayerServer);
 
     error = deserializeJson(doc, dataReceived);
@@ -113,6 +115,7 @@ void updatePrayerTimings(){
     if (error) {
       Serial.print("deserializeJson() failed: ");
       Serial.println(error.c_str());
+
       return;
     }
 
@@ -166,7 +169,7 @@ uint64_t getNextPrayerTimeDelay(){
   uint64_t delay = 0;
   
   getLocalTime(&timeinfo);
-  
+
   getLocalTime(&fajrTime);
   fajrTime.tm_hour = prayerTimings.fajr.hour;
   fajrTime.tm_min = prayerTimings.fajr.minute;
@@ -230,7 +233,9 @@ uint64_t getNextPrayerTimeDelay(){
     prayerTimings.nextPrayerName = "Isha";
   }
   else {
-    delay = 0;
+    fajrTime.tm_mday = timeinfo.tm_mday + 1;
+    delay = difftime(mktime(&fajrTime), mktime(&timeinfo));
+
     Serial.println("Tomorrow");
     prayerTimings.nextPrayer = prayerTimings.fajr;
     prayerTimings.nextPrayerName = "Fajr";
@@ -241,6 +246,10 @@ uint64_t getNextPrayerTimeDelay(){
 
 void IRAM_ATTR prayerAlert() {
   isTimeToPray = true;
+}
+
+void IRAM_ATTR prayed() {
+  isPrayed = true;
 }
 
 void displayNextPrayer(){
@@ -310,6 +319,8 @@ void setup() {
 
   displayNextPrayer();
 
+  attachInterrupt(GPIO_NUM_2, prayed, FALLING);
+
   timer = timerBegin(0, 80, true);
   timerAttachInterrupt(timer, &prayerAlert, true);
   timerAlarmWrite(timer, delay, true);
@@ -317,25 +328,33 @@ void setup() {
 }
 
 void loop() {
+
   while(!isTimeToPray);
   isTimeToPray = false;
 
+  timerAlarmDisable(timer);
   
+
   display.clearDisplay();
   display.setCursor(0,10);
   display.println("Time to pray");
   display.display();
 
-  delay(5000);
+  while (!isPrayed);
+  isPrayed = false;
+
+  display.clearDisplay();
 
   getLocalTime(&timeinfo);
+  
   updatePrayerTimings();
 
   uint64_t delay = getNextPrayerTimeDelay();
+  Serial.println(delay);
 
   displayNextPrayer();
 
-  timerAlarmWrite(timer, delay, false);
+  timerAlarmWrite(timer, delay, true);
   timerAlarmEnable(timer);
 
 }
