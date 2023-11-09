@@ -1,360 +1,131 @@
-#include <Wire.h>
-#include <Adafruit_GFX.h>
-#include <Adafruit_SSD1306.h>
-#include <Fonts/FreeMonoOblique9pt7b.h>
-#include <Fonts/Picopixel.h>
-#include <Fonts/TomThumb.h>
-#include <WiFiClientSecure.h>
-#include <WiFi.h>
-#include <HTTPClient.h>
-#include <ArduinoJson.h>
-#include <time.h>
+/*===========================================================================*/
+/// \file main.cpp
+///
+/// \brief
+///    The main entry point for the application
+/// \author
+///     Ayoub Q.
+///
+/*=============================================================================
+                                     Includes
+=============================================================================*/
 
-#define SCREEN_WIDTH 128 // OLED display width, in pixels
-#define SCREEN_HEIGHT 64 // OLED display height, in pixels
+#include "Wire.h"
+#include <mod_timings.h>
+#include <mod_prayer.h>
+#include <svc_display.h>
+#include <mod_cli0.h>
+/*=============================================================================
+                                     Defines
+=============================================================================*/
 
-struct DayTime {
-  uint8_t hour;
-  uint8_t minute;
+/*=============================================================================
+                                      Enums
+=============================================================================*/
+
+/*=============================================================================
+                                 Type definitions
+=============================================================================*/
+
+/*=============================================================================
+                                    Structures
+=============================================================================*/
+
+/*=============================================================================
+                            Private Function Prototypes
+=============================================================================*/
+
+bool mainCreateTask(const TaskParameters_t *taskParameters, TaskHandle_t *taskHandle);
+
+/*=============================================================================
+                                Private Variables
+=============================================================================*/
+static TaskHandle_t modCliTaskHandle = nullptr;
+static TaskHandle_t modBTETaskHandle = nullptr;
+static TaskHandle_t modPrayerTaskHandle = nullptr;
+static QueueHandle_t timingsQueue;
+
+static SemaphoreHandle_t prayerSemaphore;
+
+static modBTEParams_t modBTEParams;
+static modPrayerParams_t modPrayerParams;
+
+/*=============================================================================
+                                Private Constants
+=============================================================================*/
+
+static const TaskParameters_t modBTETaskParams = {
+        modBTETaskProcess,
+        "modTimingsTask",
+        8192,
+        (void *) &modBTEParams,
+        5};
+
+static const TaskParameters_t modPrayerTaskParams = {
+        modPrayerTaskProcess,
+        "modPrayerTask",
+        8192,
+        (void *) &modPrayerParams,
+        5};
+
+static const TaskParameters_t modCliParameters = {
+        modCli0EntryPoint,
+        "CLI0",
+        3000,
+        reinterpret_cast<void *>(1),
+        0,
 };
 
-struct PrayerTimings {
-  DayTime fajr;
-  DayTime dhuhr;
-  DayTime asr;
-  DayTime maghrib;
-  DayTime isha;
-  DayTime nextPrayer;
-  String nextPrayerName;
-};
 
-Adafruit_SSD1306 display(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, -1);
-
-PrayerTimings prayerTimings;
-
-const char* ssid = "Salam667";
-const char* password = "milouda1965$";
-
-const char* prayerServer = "http://api.aladhan.com/v1/calendarByCity/2023/5?city=Montreal&country=Canada";
-
-tm timeinfo;
-
-tm fajrTime;
-tm duhrTime;
-tm asrTime;
-tm maghribTime;
-tm ishaTime;
-
-
-hw_timer_t * timer = NULL;
-
-uint8_t currentDay = 0;
-uint8_t currentMonth = 0;
-
-DeserializationError error;
-DynamicJsonDocument doc(62770);
-
-String dataReceived = "";
-
-volatile bool isTimeToPray = false;
-volatile bool isPrayed = false;
-
-DayTime convertStringToDayTime(const char* timeString){
-  DayTime dayTime;
-  char hourString[3];
-  char minuteString[3];
-
-  hourString[0] = timeString[0];
-  hourString[1] = timeString[1];
-
-  minuteString[0] = timeString[3];
-  minuteString[1] = timeString[4];
-
-  dayTime.hour = atoi(hourString);
-  dayTime.minute = atoi(minuteString);
-
-  return dayTime;
-}
-
-String httpGETRequest(const char* serverName) {
-  WiFiClient client;
-  HTTPClient http;
-    
-  http.begin(client, serverName);
-
-  int httpResponseCode = http.GET();
-  
-  String payload = ""; 
-  
-  if (httpResponseCode>0) {
-    Serial.print("HTTP Response code: ");
-    Serial.println(httpResponseCode);
-    payload = http.getString();
-  }
-  else {
-    Serial.print("Error code: ");
-    Serial.println(httpResponseCode);
-  }
-  // Free resources
-  http.end();
-
-  return payload;
-}
-
-void updatePrayerTimings(){
-  if(WiFi.status()== WL_CONNECTED) {
-      
-    // ----------------- JSON -----------------
-    doc.clear();
-    
-    
-    dataReceived = httpGETRequest(prayerServer);
-
-    error = deserializeJson(doc, dataReceived);
-
-    if (error) {
-      Serial.print("deserializeJson() failed: ");
-      Serial.println(error.c_str());
-
-      return;
-    }
-
-    for (JsonObject data_item : doc["data"].as<JsonArray>()) {
-
-      uint8_t day = data_item["date"]["gregorian"]["day"].as<uint8_t>();
-      uint8_t month = data_item["date"]["gregorian"]["month"]["number"].as<uint8_t>();
-
-      if (day == currentDay && month == currentMonth) {
-
-        Serial.println("=====================================");
-      
-        const char* data_item_date_readable = data_item["date"]["readable"];
-        Serial.print("Date: ");
-        Serial.println(data_item_date_readable);
-
-        const char* data_item_timings_Fajr = data_item["timings"]["Fajr"];
-        Serial.print("Fajr: ");
-        Serial.println(data_item_timings_Fajr);
-        prayerTimings.fajr = convertStringToDayTime(data_item_timings_Fajr);
-
-        const char* data_item_timings_Dhuhr = data_item["timings"]["Dhuhr"];
-        Serial.print("Dhuhr: ");
-        Serial.println(data_item_timings_Dhuhr);
-        prayerTimings.dhuhr = convertStringToDayTime(data_item_timings_Dhuhr);
-
-        const char* data_item_timings_Asr = data_item["timings"]["Asr"];
-        Serial.print("Asr: ");
-        Serial.println(data_item_timings_Asr);
-        prayerTimings.asr = convertStringToDayTime(data_item_timings_Asr);
-
-        const char* data_item_timings_Maghrib = data_item["timings"]["Maghrib"];
-        Serial.print("Maghrib: ");
-        Serial.println(data_item_timings_Maghrib);
-        prayerTimings.maghrib = convertStringToDayTime(data_item_timings_Maghrib);
-
-        const char* data_item_timings_Isha = data_item["timings"]["Isha"];
-        Serial.print("Isha: ");
-        Serial.println(data_item_timings_Isha);
-        prayerTimings.isha = convertStringToDayTime(data_item_timings_Isha);
-
-        Serial.println("=====================================");
-        break;
-      }      
-    }
-  }
-}
-
-
-uint64_t getNextPrayerTimeDelay(){
-  uint64_t delay = 0;
-  
-  getLocalTime(&timeinfo);
-
-  getLocalTime(&fajrTime);
-  fajrTime.tm_hour = prayerTimings.fajr.hour;
-  fajrTime.tm_min = prayerTimings.fajr.minute;
-  fajrTime.tm_sec = 0;
-
-  getLocalTime(&duhrTime);
-  duhrTime.tm_hour = prayerTimings.dhuhr.hour;
-  duhrTime.tm_min = prayerTimings.dhuhr.minute;
-  duhrTime.tm_sec = 0;
-
-  getLocalTime(&asrTime);
-  asrTime.tm_hour = prayerTimings.asr.hour;
-  asrTime.tm_min = prayerTimings.asr.minute;
-  asrTime.tm_sec = 0;
-
-  
-  getLocalTime(&maghribTime);
-  maghribTime.tm_hour = prayerTimings.maghrib.hour;
-  maghribTime.tm_min = prayerTimings.maghrib.minute;
-  maghribTime.tm_sec = 0;
-
-  getLocalTime(&ishaTime);
-  ishaTime.tm_hour = prayerTimings.isha.hour;
-  ishaTime.tm_min = prayerTimings.isha.minute;
-  ishaTime.tm_sec = 0;
-
-  double diffFajr = difftime(mktime(&fajrTime), mktime(&timeinfo));
-  double diffDhuhr = difftime(mktime(&duhrTime), mktime(&timeinfo));
-  double diffAsr = difftime(mktime(&asrTime), mktime(&timeinfo));
-  double diffMaghrib = difftime(mktime(&maghribTime), mktime(&timeinfo));
-  double diffIsha = difftime(mktime(&ishaTime), mktime(&timeinfo));
-
-  if (diffFajr > 0) {
-    delay = diffFajr;
-    Serial.println("Fajr");
-    prayerTimings.nextPrayer = prayerTimings.fajr;
-    prayerTimings.nextPrayerName = "Fajr";
-  }
-  else if (diffDhuhr > 0) {
-    delay = diffDhuhr;
-    Serial.println("Dhuhr");
-    prayerTimings.nextPrayer = prayerTimings.dhuhr;
-    prayerTimings.nextPrayerName = "Dhuhr";
-  }
-  else if (diffAsr > 0) {
-    delay = diffAsr;
-    Serial.println("Asr");
-    prayerTimings.nextPrayer = prayerTimings.asr;
-    prayerTimings.nextPrayerName = "Asr";
-  }
-  else if (diffMaghrib > 0) {
-    delay = diffMaghrib;
-    Serial.println("Maghrib");
-    prayerTimings.nextPrayer = prayerTimings.maghrib;
-    prayerTimings.nextPrayerName = "Maghrib";
-  }
-  else if (diffIsha > 0) {
-    delay = diffIsha;
-    Serial.println("Isha");
-    prayerTimings.nextPrayer = prayerTimings.isha;
-    prayerTimings.nextPrayerName = "Isha";
-  }
-  else {
-    fajrTime.tm_mday = timeinfo.tm_mday + 1;
-    delay = difftime(mktime(&fajrTime), mktime(&timeinfo));
-
-    Serial.println("Tomorrow");
-    prayerTimings.nextPrayer = prayerTimings.fajr;
-    prayerTimings.nextPrayerName = "Fajr";
-  }
-
-  return delay * 1000000;
-}
-
-void IRAM_ATTR prayerAlert() {
-  isTimeToPray = true;
-}
-
-void IRAM_ATTR prayed() {
-  isPrayed = true;
-}
-
-void displayNextPrayer(){
-  int16_t x1;
-  int16_t y1;
-  uint16_t width;
-  uint16_t height;
-
-  display.setCursor(0, 15);
-  display.clearDisplay();
-  display.println("Next prayer:");
-
-  display.getTextBounds(prayerTimings.nextPrayerName, 0, 0, &x1, &y1, &width, &height);
-  display.setCursor((SCREEN_WIDTH - width) / 2, 35);
-  display.println(prayerTimings.nextPrayerName); 
-
-  display.setCursor(33, 55);
-  display.print(prayerTimings.nextPrayer.hour);
-  display.print(":");
-  display.println(prayerTimings.nextPrayer.minute);
-  display.display();
-}
+/*=============================================================================
+                                Public Functions
+=============================================================================*/
 
 void setup() {
-  Serial.begin(115200);
+    Serial.begin(115200);
 
-  if(!display.begin(SSD1306_SWITCHCAPVCC, 0x3C)) { 
-    Serial.println(F("SSD1306 allocation failed"));
-    for(;;);
-  }
+    prayerSemaphore = xSemaphoreCreateBinary();
 
-  delay(500);
-  display.clearDisplay();
+    timingsQueue = xQueueCreate(MAX_DAYS, sizeof(PrayerTimings));
 
-  display.setFont(&FreeMonoOblique9pt7b);
-  display.setTextSize(1);
-  display.setTextColor(WHITE);
-  display.setCursor(0, 20);
+    bool status = modCli0Init();
+    mainCreateTask(&modCliParameters, &modCliTaskHandle);
+    Serial.printf("[%s] CLI service \n", status ? "O" : "X");
 
-  WiFi.begin(ssid, password);
-  display.println("Connecting");
-  display.display();
+    status = svcDisplayInit();
+    Serial.printf("[%s] Display service \n", status ? "O" : "X");
 
-  while(WiFi.status() != WL_CONNECTED);
+    modBTEParams.timingsQueue = timingsQueue;
+    modBTEParams.prayerSemaphore = prayerSemaphore;
+    status = mainCreateTask(&modBTETaskParams, &modBTETaskHandle);
+    Serial.printf("[%s] BTE module \n", status ? "O" : "X");
 
-  display.println("Connected");
-  display.display();
+    modPrayerParams.prayersQueue = timingsQueue;
+    modPrayerParams.prayerSemaphore = prayerSemaphore;
+    status = mainCreateTask(&modPrayerTaskParams, &modPrayerTaskHandle);
+    Serial.printf("[%s] Prayer module \n", status ? "O" : "X");
 
-  delay(500);
-  display.clearDisplay();
-  display.setCursor(0, 20);
-
-  // Config time for Montreal Time Zone
-  configTime(-4 * 3600, 0, "pool.ntp.org", "time.nist.gov");
-  getLocalTime(&timeinfo);
-
-  currentDay = timeinfo.tm_mday;
-  currentMonth = timeinfo.tm_mon + 1;
-
-  display.println(&timeinfo, "%A, %B %d %Y %H:%M:%S");
-  display.display();
-  updatePrayerTimings();
-
-  uint64_t delay = getNextPrayerTimeDelay();
-  Serial.println(delay);
-  display.clearDisplay();
-
-  displayNextPrayer();
-
-  attachInterrupt(GPIO_NUM_2, prayed, FALLING);
-
-  timer = timerBegin(0, 80, true);
-  timerAttachInterrupt(timer, &prayerAlert, true);
-  timerAlarmWrite(timer, delay, true);
-  timerAlarmEnable(timer);
 }
 
 void loop() {
+    delay(2000);
+}
 
-  while(!isTimeToPray);
-  isTimeToPray = false;
+/*=============================================================================
+                                Private Functions
+=============================================================================*/
+bool mainCreateTask(const TaskParameters_t *taskParameters, TaskHandle_t *taskHandle) {
+    const BaseType_t xReturned = xTaskCreate(taskParameters->pvTaskCode,
+                                             taskParameters->pcName,
+                                             taskParameters->usStackDepth,
+                                             taskParameters->pvParameters,
+                                             taskParameters->uxPriority,
+                                             taskHandle);
 
-  timerAlarmDisable(timer);
-  
+    if (xReturned != pdPASS) {
+        Serial.printf("Failed to create task %s\n", taskParameters->pcName);
+        return false;
+    }
 
-  display.clearDisplay();
-  display.setCursor(0,10);
-  display.println("Time to pray");
-  display.display();
-
-  while (!isPrayed);
-  isPrayed = false;
-
-  display.clearDisplay();
-
-  getLocalTime(&timeinfo);
-  
-  updatePrayerTimings();
-
-  uint64_t delay = getNextPrayerTimeDelay();
-  Serial.println(delay);
-
-  displayNextPrayer();
-
-  timerAlarmWrite(timer, delay, true);
-  timerAlarmEnable(timer);
-
+    return true;
 }
