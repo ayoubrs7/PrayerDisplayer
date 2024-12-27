@@ -8,7 +8,7 @@
 ///    Detailed description of the module purpose goes here
 ///
 /// \author
-///    Ayoub Q.
+///    Adam Q.
 ///
 /*===========================================================================*/
 
@@ -72,7 +72,7 @@ static unsigned long previousTime = 0;
 static char cmdBuffer[MOD_CLI0_CMD_BUFFER_SIZE];
 
 static modCli0Config_t modCli0Config = {
-        .echo = true,
+    .echo = true,
 };
 
 static modCliCmdHelpInfo_t cmdHelpInformations[MOD_CLI0_CMD_HELP_DATA_SIZE];

@@ -22,6 +22,7 @@
 /*=============================================================================
                                      Defines
 =============================================================================*/
+
 #define SERVICE_UUID "4fafc201-1fb5-459e-8fcc-c5c9c331914b"
 #define CHARACTERISTIC_UUID "beb5483e-36e1-4688-b7f5-ea07361b26a8"
 
@@ -54,17 +55,20 @@
 /*=============================================================================
                                 Private Constants
 =============================================================================*/
+
 static const PrayerTimings nullPrayerTimings = {
-        {0, 0, NONE},
-        {0, 0, NONE},
-        {0, 0, NONE},
-        {0, 0, NONE},
-        {0, 0, NONE},
-        "0/0/0"};
+    {0, 0, NONE},
+    {0, 0, NONE},
+    {0, 0, NONE},
+    {0, 0, NONE},
+    {0, 0, NONE},
+    "0/0/0"
+};
 
 /*=============================================================================
                                 Private Variables
 =============================================================================*/
+
 static bool deviceConnected = false;
 static PrayerTimings timings[MAX_DAYS] = {nullPrayerTimings};
 static bool finishedReceiving = false;
@@ -76,6 +80,7 @@ static SemaphoreHandle_t prayerSemaphore;
 /*=============================================================================
                                 Class Definitions
 =============================================================================*/
+
 class ConnectionCallbacks : public BLEServerCallbacks {
     void onConnect(BLEServer *pServer) override {
         Serial.println("Device connected");
@@ -176,9 +181,9 @@ _Noreturn void modBTETaskProcess(void *pvParameters) {
     BLEServer *pServer = BLEDevice::createServer();
     BLEService *pService = pServer->createService(SERVICE_UUID);
     BLECharacteristic *pCharacteristic = pService->createCharacteristic(
-            CHARACTERISTIC_UUID,
-            BLECharacteristic::PROPERTY_READ |
-            BLECharacteristic::PROPERTY_WRITE);
+        CHARACTERISTIC_UUID,
+        BLECharacteristic::PROPERTY_READ |
+        BLECharacteristic::PROPERTY_WRITE);
     pServer->setCallbacks(new ConnectionCallbacks());
     pCharacteristic->setCallbacks(new OperationCallbacks());
     pService->start();
@@ -192,7 +197,6 @@ _Noreturn void modBTETaskProcess(void *pvParameters) {
 
     while (true) {
         if (finishedReceiving) {
-
             int remainingDays = MAX_DAYS - currentDay;
             for (int i = -1; i < remainingDays; i++) {
                 if (timings[currentDay + i].date == "0/0/0") {
