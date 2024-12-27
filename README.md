@@ -9,3 +9,4 @@ Note: For now, it is capable of running on its own for the rest of the month aft
 - ESP32 device (esp32dev)
 - Small OLED display
   - We are using a 128x64 SSD1306 OLED display
+

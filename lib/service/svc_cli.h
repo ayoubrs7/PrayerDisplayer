@@ -8,7 +8,7 @@
 ///     Handle the command line interface for the device
 ///
 /// \author
-///     Ayoub Q.
+///     Adam Q.
 ///
 /*===========================================================================*/
 

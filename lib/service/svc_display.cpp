@@ -1,4 +1,3 @@
-#include "svc_display.h"
 /*===========================================================================*/
 /// \file svc_display.cpp
 ///
@@ -16,14 +15,19 @@
 /*=============================================================================
                                      Includes
 =============================================================================*/
+
+#include "svc_display.h"
 #include "Adafruit_SSD1306.h"
 #include "Fonts/FreeSerif9pt7b.h"
 #include <Wire.h>
+
 /*=============================================================================
                                      Defines
 =============================================================================*/
+
 #define SCREEN_WIDTH 128 // OLED display width, in pixels
 #define SCREEN_HEIGHT 64 // OLED display height, in pixels
+
 /*=============================================================================
                                      Macros
 =============================================================================*/
@@ -39,13 +43,15 @@
 /*=============================================================================
                             Private Function Prototypes
 =============================================================================*/
-String svcPrayerNameToString(PrayerName
-                             prayerName);
+
+String svcPrayerNameToString(PrayerName prayerName);
 
 /*=============================================================================
                                 Private Variables
 =============================================================================*/
+
 Adafruit_SSD1306 display(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, -1);
+
 /*=============================================================================
                                 Private Constants
 =============================================================================*/
@@ -57,7 +63,8 @@ Adafruit_SSD1306 display(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, -1);
 /*=============================================================================
                                 Public Functions
 =============================================================================*/
-bool svcDisplayInit(void) {
+
+bool svcDisplayInit() {
     if (!display.begin(SSD1306_SWITCHCAPVCC, 0x3C)) {
         return false;
     }
@@ -74,7 +81,6 @@ bool svcDisplayInit(void) {
 }
 
 void svcDisplayNextPrayer(Prayer nextPrayer) {
-
     display.clearDisplay(); // Clear the display before drawing new content
 
     // Display the header
@@ -93,7 +99,7 @@ void svcDisplayNextPrayer(Prayer nextPrayer) {
 
     // Display the prayer time
     display.setTextSize(1); // Keep the same text size for consistency
-    char timeBuffer[6];     // Buffer to hold the formatted time string
+    char timeBuffer[6]; // Buffer to hold the formatted time string
     sprintf(timeBuffer, "%02d:%02d", nextPrayer.hour, nextPrayer.minute);
     display.getTextBounds(timeBuffer, 0, 0, &x1, &y1, &w, &h);
     display.setCursor((SCREEN_WIDTH - w) / 2, 55); // Adjust cursor position
@@ -106,8 +112,7 @@ void svcDisplayNextPrayer(Prayer nextPrayer) {
                                 Private Functions
 =============================================================================*/
 
-String svcPrayerNameToString(PrayerName
-                             prayerName) {
+String svcPrayerNameToString(PrayerName prayerName) {
     switch (prayerName) {
         case FAJR:
             return "Fajr";

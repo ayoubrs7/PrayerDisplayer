@@ -7,7 +7,7 @@
 ///     Detailed description of the module purpose goes here
 ///
 /// \author
-///     Ayoub Q.
+///     Adam Q.
 ///
 /*===========================================================================*/
 

@@ -8,7 +8,7 @@
 ///    Detailed description of the module purpose goes here
 ///
 /// \author
-///    Ayoub Q.
+///    Adam Q.
 ///
 /*===========================================================================*/
 
@@ -91,9 +91,9 @@ void svcCliAddCmdHelp(const char *name, const char *description) {
 
     if (cmdHelpSize < MOD_CLI0_CMD_HELP_DATA_SIZE) {
         cmdHelpData[cmdHelpSize] = {
-                .isUsed = true,
-                .name = name,
-                .description = description
+            .isUsed = true,
+            .name = name,
+            .description = description
         };
     } else {
         Serial.println("[ERROR] : No more space for help data");

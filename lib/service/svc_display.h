@@ -18,8 +18,10 @@
 /*=============================================================================
                                      Includes
 =============================================================================*/
+
 #include <Arduino.h>
 #include <mod_timings.h>
+
 /*=============================================================================
                                      Defines
 =============================================================================*/
@@ -50,10 +52,10 @@
 
 /// \brief Initialize the display
 /// \return true if the display was initialized successfully, false otherwise
-bool svcDisplayInit(void);
+bool svcDisplayInit();
 
 /// \brief Display the prayer timings on the screen
-/// \param timings The prayer timings to be displayed
+/// \param nextPrayer The prayer timings to be displayed
 void svcDisplayNextPrayer(Prayer nextPrayer);
 
 #endif // SVC_DISPLAY_H
